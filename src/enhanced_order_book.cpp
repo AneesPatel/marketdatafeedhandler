@@ -243,38 +243,51 @@ void EnhancedOrderBook::clear() {
 }
 
 void EnhancedOrderBook::remove_from_price_level(const Order& order) {
-    auto& levels = (order.side == 'B' || order.side == 'b') ? bids_ : asks_;
-    auto& total_qty = (order.side == 'B' || order.side == 'b') ? 
-                      total_bid_quantity_ : total_ask_quantity_;
-    
-    auto it = levels.find(order.price);
-    if (it != levels.end()) {
-        auto& level = it->second;
-        
-        if (level.size >= order.quantity) {
-            level.size -= order.quantity;
-            total_qty -= order.quantity;
+    if (order.side == 'B' || order.side == 'b') {
+        auto it = bids_.find(order.price);
+        if (it != bids_.end()) {
+            auto& level = it->second;
+            if (level.size >= order.quantity) {
+                level.size -= order.quantity;
+                total_bid_quantity_ -= order.quantity;
+            }
+            if (level.order_count > 0) {
+                level.order_count--;
+            }
+            if (level.size == 0 || level.order_count == 0) {
+                bids_.erase(it);
+            }
         }
-        
-        if (level.order_count > 0) {
-            level.order_count--;
-        }
-        
-        if (level.size == 0 || level.order_count == 0) {
-            levels.erase(it);
+    } else {
+        auto it = asks_.find(order.price);
+        if (it != asks_.end()) {
+            auto& level = it->second;
+            if (level.size >= order.quantity) {
+                level.size -= order.quantity;
+                total_ask_quantity_ -= order.quantity;
+            }
+            if (level.order_count > 0) {
+                level.order_count--;
+            }
+            if (level.size == 0 || level.order_count == 0) {
+                asks_.erase(it);
+            }
         }
     }
 }
 
 void EnhancedOrderBook::add_to_price_level(const Order& order) {
-    auto& levels = (order.side == 'B' || order.side == 'b') ? bids_ : asks_;
-    auto& total_qty = (order.side == 'B' || order.side == 'b') ? 
-                      total_bid_quantity_ : total_ask_quantity_;
-    
-    auto& level = levels[order.price];
-    level.price = order.price;
-    level.size += order.quantity;
-    level.order_count++;
-    
-    total_qty += order.quantity;
+    if (order.side == 'B' || order.side == 'b') {
+        auto& level = bids_[order.price];
+        level.price = order.price;
+        level.size += order.quantity;
+        level.order_count++;
+        total_bid_quantity_ += order.quantity;
+    } else {
+        auto& level = asks_[order.price];
+        level.price = order.price;
+        level.size += order.quantity;
+        level.order_count++;
+        total_ask_quantity_ += order.quantity;
+    }
 }

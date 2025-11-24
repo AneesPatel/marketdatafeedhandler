@@ -5,6 +5,15 @@
 #include <vector>
 #include <new>
 
+#ifdef _WIN32
+#include <malloc.h>
+#define aligned_alloc_compat(align, size) _aligned_malloc(size, align)
+#define aligned_free_compat(ptr) _aligned_free(ptr)
+#else
+#define aligned_alloc_compat(align, size) aligned_alloc(align, size)
+#define aligned_free_compat(ptr) free(ptr)
+#endif
+
 template<typename T, size_t ChunkSize = 4096>
 class MemoryPool {
     union Slot {
@@ -23,7 +32,7 @@ class MemoryPool {
     
     void allocate_chunk() {
         Chunk* chunk = static_cast<Chunk*>(
-            aligned_alloc(64, sizeof(Chunk))
+            aligned_alloc_compat(64, sizeof(Chunk))
         );
         
         chunk->next = chunks_;
@@ -44,7 +53,7 @@ public:
     ~MemoryPool() {
         while (chunks_) {
             Chunk* next = chunks_->next;
-            free(chunks_);
+            aligned_free_compat(chunks_);
             chunks_ = next;
         }
     }

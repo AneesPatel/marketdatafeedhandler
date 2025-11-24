@@ -9,6 +9,7 @@
 #include "lock_free_queue.hpp"
 #include "latency_tracker.hpp"
 #include "pcap_reader.hpp"
+#include "memory_pool.hpp"
 #include <iostream>
 #include <fstream>
 #include <thread>

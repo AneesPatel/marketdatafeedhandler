@@ -4,6 +4,16 @@
 #include <optional>
 #include <memory>
 #include <new>
+#include <cstdlib>
+
+#ifdef _WIN32
+#include <malloc.h>
+#define aligned_alloc_compat(align, size) _aligned_malloc(size, align)
+#define aligned_free_compat(ptr) _aligned_free(ptr)
+#else
+#define aligned_alloc_compat(align, size) aligned_alloc(align, size)
+#define aligned_free_compat(ptr) free(ptr)
+#endif
 
 template<typename T>
 class SPSCQueue {
@@ -31,7 +41,7 @@ public:
         }
         
         buffer_ = static_cast<Node*>(
-            aligned_alloc(CACHE_LINE, sizeof(Node) * capacity)
+            aligned_alloc_compat(CACHE_LINE, sizeof(Node) * capacity)
         );
         
         for (size_t i = 0; i < capacity; ++i) {
@@ -44,7 +54,7 @@ public:
         for (size_t i = 0; i < capacity_; ++i) {
             buffer_[i].~Node();
         }
-        free(buffer_);
+        aligned_free_compat(buffer_);
     }
     
     SPSCQueue(const SPSCQueue&) = delete;

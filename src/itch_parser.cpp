@@ -4,256 +4,173 @@
 
 namespace itch {
 
-uint16_t swap_uint16(uint16_t val) {
-    return (val >> 8) | (val << 8);
-}
-
-uint32_t swap_uint32(uint32_t val) {
-    return ((val >> 24) & 0xff) | 
-           ((val >> 8) & 0xff00) | 
-           ((val << 8) & 0xff0000) | 
-           ((val << 24) & 0xff000000);
-}
-
-uint64_t swap_uint64(uint64_t val) {
-    return ((val >> 56) & 0x00000000000000ffULL) |
-           ((val >> 40) & 0x000000000000ff00ULL) |
-           ((val >> 24) & 0x0000000000ff0000ULL) |
-           ((val >> 8)  & 0x00000000ff000000ULL) |
-           ((val << 8)  & 0x000000ff00000000ULL) |
-           ((val << 24) & 0x0000ff0000000000ULL) |
-           ((val << 40) & 0x00ff000000000000ULL) |
-           ((val << 56) & 0xff00000000000000ULL);
-}
-
-std::string stock_to_string(const char stock[8]) {
-    std::string result(stock, 8);
-    result.erase(std::find_if(result.rbegin(), result.rend(), 
-                 [](unsigned char ch) { return !std::isspace(ch); }).base(), 
-                 result.end());
-    return result;
-}
-
-Parser::Parser(const uint8_t* data, size_t size) 
-    : buffer_(data), size_(size), offset_(0) {}
-
-bool Parser::has_more() const {
-    return offset_ < size_;
-}
-
 std::optional<Message> Parser::parse_next() {
-    if (offset_ + sizeof(MessageHeader) > size_) {
+    if (offset_ + 3 > size_) {
         return std::nullopt;
     }
-    
-    const MessageHeader* header = 
-        reinterpret_cast<const MessageHeader*>(buffer_ + offset_);
-    
-    uint16_t msg_length = swap_uint16(header->length);
-    uint8_t msg_type = header->type;
-    
+
+    uint16_t msg_length = swap_uint16(*reinterpret_cast<const uint16_t*>(buffer_ + offset_));
+    char msg_type = static_cast<char>(buffer_[offset_ + 2]);
+
     if (offset_ + msg_length > size_) {
         return std::nullopt;
     }
-    
-    Message result;
-    bool parsed = false;
-    
+
+    std::optional<Message> result;
+
     switch (msg_type) {
         case 'S': {
-            SystemEvent msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(SystemEvent)) {
+                SystemEvent event;
+                std::memcpy(&event, buffer_ + offset_, sizeof(SystemEvent));
+                event.length = swap_uint16(event.length);
+                event.stock_locate = swap_uint16(event.stock_locate);
+                event.tracking_number = swap_uint16(event.tracking_number);
+                event.timestamp = swap_uint64(event.timestamp);
+                result = event;
+            }
             break;
         }
         case 'R': {
-            StockDirectory msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(StockDirectory)) {
+                StockDirectory dir;
+                std::memcpy(&dir, buffer_ + offset_, sizeof(StockDirectory));
+                dir.length = swap_uint16(dir.length);
+                dir.stock_locate = swap_uint16(dir.stock_locate);
+                dir.tracking_number = swap_uint16(dir.tracking_number);
+                dir.timestamp = swap_uint64(dir.timestamp);
+                dir.round_lot_size = swap_uint32(dir.round_lot_size);
+                dir.etp_leverage_factor = swap_uint32(dir.etp_leverage_factor);
+                result = dir;
+            }
             break;
         }
         case 'A': {
-            AddOrder msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(AddOrder)) {
+                AddOrder add;
+                std::memcpy(&add, buffer_ + offset_, sizeof(AddOrder));
+                add.length = swap_uint16(add.length);
+                add.stock_locate = swap_uint16(add.stock_locate);
+                add.tracking_number = swap_uint16(add.tracking_number);
+                add.timestamp = swap_uint64(add.timestamp);
+                add.order_reference = swap_uint64(add.order_reference);
+                add.shares = swap_uint32(add.shares);
+                add.price = swap_uint32(add.price);
+                result = add;
+            }
             break;
         }
         case 'F': {
-            AddOrderMPID msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(AddOrderMPID)) {
+                AddOrderMPID add;
+                std::memcpy(&add, buffer_ + offset_, sizeof(AddOrderMPID));
+                add.length = swap_uint16(add.length);
+                add.stock_locate = swap_uint16(add.stock_locate);
+                add.tracking_number = swap_uint16(add.tracking_number);
+                add.timestamp = swap_uint64(add.timestamp);
+                add.order_reference = swap_uint64(add.order_reference);
+                add.shares = swap_uint32(add.shares);
+                add.price = swap_uint32(add.price);
+                result = add;
+            }
             break;
         }
         case 'E': {
-            OrderExecuted msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(OrderExecuted)) {
+                OrderExecuted exec;
+                std::memcpy(&exec, buffer_ + offset_, sizeof(OrderExecuted));
+                exec.length = swap_uint16(exec.length);
+                exec.stock_locate = swap_uint16(exec.stock_locate);
+                exec.tracking_number = swap_uint16(exec.tracking_number);
+                exec.timestamp = swap_uint64(exec.timestamp);
+                exec.order_reference = swap_uint64(exec.order_reference);
+                exec.executed_shares = swap_uint32(exec.executed_shares);
+                exec.match_number = swap_uint64(exec.match_number);
+                result = exec;
+            }
             break;
         }
         case 'C': {
-            OrderExecutedWithPrice msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(OrderExecutedWithPrice)) {
+                OrderExecutedWithPrice exec;
+                std::memcpy(&exec, buffer_ + offset_, sizeof(OrderExecutedWithPrice));
+                exec.length = swap_uint16(exec.length);
+                exec.stock_locate = swap_uint16(exec.stock_locate);
+                exec.tracking_number = swap_uint16(exec.tracking_number);
+                exec.timestamp = swap_uint64(exec.timestamp);
+                exec.order_reference = swap_uint64(exec.order_reference);
+                exec.executed_shares = swap_uint32(exec.executed_shares);
+                exec.match_number = swap_uint64(exec.match_number);
+                exec.execution_price = swap_uint32(exec.execution_price);
+                result = exec;
+            }
             break;
         }
         case 'X': {
-            OrderCancel msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(OrderCancel)) {
+                OrderCancel cancel;
+                std::memcpy(&cancel, buffer_ + offset_, sizeof(OrderCancel));
+                cancel.length = swap_uint16(cancel.length);
+                cancel.stock_locate = swap_uint16(cancel.stock_locate);
+                cancel.tracking_number = swap_uint16(cancel.tracking_number);
+                cancel.timestamp = swap_uint64(cancel.timestamp);
+                cancel.order_reference = swap_uint64(cancel.order_reference);
+                cancel.cancelled_shares = swap_uint32(cancel.cancelled_shares);
+                result = cancel;
+            }
             break;
         }
         case 'D': {
-            OrderDelete msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(OrderDelete)) {
+                OrderDelete del;
+                std::memcpy(&del, buffer_ + offset_, sizeof(OrderDelete));
+                del.length = swap_uint16(del.length);
+                del.stock_locate = swap_uint16(del.stock_locate);
+                del.tracking_number = swap_uint16(del.tracking_number);
+                del.timestamp = swap_uint64(del.timestamp);
+                del.order_reference = swap_uint64(del.order_reference);
+                result = del;
+            }
             break;
         }
         case 'U': {
-            OrderReplace msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(OrderReplace)) {
+                OrderReplace replace;
+                std::memcpy(&replace, buffer_ + offset_, sizeof(OrderReplace));
+                replace.length = swap_uint16(replace.length);
+                replace.stock_locate = swap_uint16(replace.stock_locate);
+                replace.tracking_number = swap_uint16(replace.tracking_number);
+                replace.timestamp = swap_uint64(replace.timestamp);
+                replace.original_order_reference = swap_uint64(replace.original_order_reference);
+                replace.new_order_reference = swap_uint64(replace.new_order_reference);
+                replace.shares = swap_uint32(replace.shares);
+                replace.price = swap_uint32(replace.price);
+                result = replace;
+            }
             break;
         }
         case 'P': {
-            Trade msg;
-            std::memcpy(&msg, buffer_ + offset_, sizeof(msg));
-            convert_endianness(msg);
-            result = msg;
-            parsed = true;
+            if (msg_length >= sizeof(Trade)) {
+                Trade trade;
+                std::memcpy(&trade, buffer_ + offset_, sizeof(Trade));
+                trade.length = swap_uint16(trade.length);
+                trade.stock_locate = swap_uint16(trade.stock_locate);
+                trade.tracking_number = swap_uint16(trade.tracking_number);
+                trade.timestamp = swap_uint64(trade.timestamp);
+                trade.order_reference = swap_uint64(trade.order_reference);
+                trade.shares = swap_uint32(trade.shares);
+                trade.price = swap_uint32(trade.price);
+                trade.match_number = swap_uint64(trade.match_number);
+                result = trade;
+            }
             break;
         }
         default:
-            offset_ += msg_length;
-            return std::nullopt;
+            break;
     }
-    
+
     offset_ += msg_length;
-    
-    return parsed ? std::optional<Message>(result) : std::nullopt;
-}
-
-template<>
-void Parser::convert_endianness(SystemEvent& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-}
-
-template<>
-void Parser::convert_endianness(StockDirectory& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.round_lot_size = swap_uint32(msg.round_lot_size);
-    msg.etp_leverage_factor = swap_uint32(msg.etp_leverage_factor);
-}
-
-template<>
-void Parser::convert_endianness(AddOrder& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.order_reference = swap_uint64(msg.order_reference);
-    msg.shares = swap_uint32(msg.shares);
-    msg.price = swap_uint32(msg.price);
-}
-
-template<>
-void Parser::convert_endianness(AddOrderMPID& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.order_reference = swap_uint64(msg.order_reference);
-    msg.shares = swap_uint32(msg.shares);
-    msg.price = swap_uint32(msg.price);
-}
-
-template<>
-void Parser::convert_endianness(OrderExecuted& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.order_reference = swap_uint64(msg.order_reference);
-    msg.executed_shares = swap_uint32(msg.executed_shares);
-    msg.match_number = swap_uint64(msg.match_number);
-}
-
-template<>
-void Parser::convert_endianness(OrderExecutedWithPrice& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.order_reference = swap_uint64(msg.order_reference);
-    msg.executed_shares = swap_uint32(msg.executed_shares);
-    msg.match_number = swap_uint64(msg.match_number);
-    msg.execution_price = swap_uint32(msg.execution_price);
-}
-
-template<>
-void Parser::convert_endianness(OrderCancel& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.order_reference = swap_uint64(msg.order_reference);
-    msg.cancelled_shares = swap_uint32(msg.cancelled_shares);
-}
-
-template<>
-void Parser::convert_endianness(OrderDelete& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.order_reference = swap_uint64(msg.order_reference);
-}
-
-template<>
-void Parser::convert_endianness(OrderReplace& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.original_order_reference = swap_uint64(msg.original_order_reference);
-    msg.new_order_reference = swap_uint64(msg.new_order_reference);
-    msg.shares = swap_uint32(msg.shares);
-    msg.price = swap_uint32(msg.price);
-}
-
-template<>
-void Parser::convert_endianness(Trade& msg) {
-    msg.length = swap_uint16(msg.length);
-    msg.stock_locate = swap_uint16(msg.stock_locate);
-    msg.tracking_number = swap_uint16(msg.tracking_number);
-    msg.timestamp = swap_uint64(msg.timestamp);
-    msg.order_reference = swap_uint64(msg.order_reference);
-    msg.shares = swap_uint32(msg.shares);
-    msg.price = swap_uint32(msg.price);
-    msg.match_number = swap_uint64(msg.match_number);
+    return result;
 }
 
 }
