@@ -1,7 +1,45 @@
 #include "itch_parser.hpp"
 #include <cstring>
+#include <algorithm>
 
 namespace itch {
+
+uint16_t swap_uint16(uint16_t val) {
+    return (val >> 8) | (val << 8);
+}
+
+uint32_t swap_uint32(uint32_t val) {
+    return ((val >> 24) & 0xff) | 
+           ((val >> 8) & 0xff00) | 
+           ((val << 8) & 0xff0000) | 
+           ((val << 24) & 0xff000000);
+}
+
+uint64_t swap_uint64(uint64_t val) {
+    return ((val >> 56) & 0x00000000000000ffULL) |
+           ((val >> 40) & 0x000000000000ff00ULL) |
+           ((val >> 24) & 0x0000000000ff0000ULL) |
+           ((val >> 8)  & 0x00000000ff000000ULL) |
+           ((val << 8)  & 0x000000ff00000000ULL) |
+           ((val << 24) & 0x0000ff0000000000ULL) |
+           ((val << 40) & 0x00ff000000000000ULL) |
+           ((val << 56) & 0xff00000000000000ULL);
+}
+
+std::string stock_to_string(const char stock[8]) {
+    std::string result(stock, 8);
+    result.erase(std::find_if(result.rbegin(), result.rend(), 
+                 [](unsigned char ch) { return !std::isspace(ch); }).base(), 
+                 result.end());
+    return result;
+}
+
+Parser::Parser(const uint8_t* data, size_t size) 
+    : buffer_(data), size_(size), offset_(0) {}
+
+bool Parser::has_more() const {
+    return offset_ < size_;
+}
 
 std::optional<Message> Parser::parse_next() {
     if (offset_ + sizeof(MessageHeader) > size_) {
