@@ -22,6 +22,32 @@ Measured on Intel Core processor at 3.99 GHz with 50,000 ITCH messages:
 | Parse Latency (p99) | 20 ns |
 | Parse Latency (p99.9) | 40 ns |
 
+### Sample Output
+
+```
+$ ./benchmark.exe
+Loaded 50000 messages (1800000 bytes)
+Calibrating CPU frequency...
+CPU frequency: 3992.47 MHz
+Warmup...
+Running benchmark...
+
+=== BENCHMARK RESULTS ===
+
+Messages parsed: 50000
+Total time: 1.098 ms
+Throughput: 45542054 msgs/sec
+
+Latency (nanoseconds):
+  Min:  0.3 ns
+  Mean: 9.8 ns
+  P50:  10.0 ns
+  P90:  10.0 ns
+  P99:  20.0 ns
+  P99.9:40.1 ns
+  Max:  250.3 ns
+```
+
 ## Build
 
 Requires C++17 compiler with optimization support.
